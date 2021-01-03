@@ -1,1 +1,3 @@
 J'ai ajouté un dossier "palette" dans les fichiers sources de go
+
+Inspiré de https://github.com/esimov/gobrot/blob/master/mandelbrot.go

@@ -27,7 +27,6 @@ var (
 
 var waitGroup sync.WaitGroup
 
-//Ca c'est les valeurs par défauts des variables
 func init() {
 	flag.Float64Var(&colorStep, "step", 6000, "Color smooth step. Value should be greater than iteration count, otherwise the value will be adjusted to the iteration count.")
 	flag.IntVar(&width, "width", 1024, "Rendered image width")
@@ -75,7 +74,7 @@ func main() {
 	time.Sleep(time.Second)
 }
 
-//Ca c'est pour donner une couleur à chaque itération
+//Une couleur est donnée à chaque itération
 func interpolateColors(paletteCode *string, numberOfColors float64) []color.RGBA {
 	var factor float64
 	steps := []float64{}
@@ -100,6 +99,7 @@ func interpolateColors(paletteCode *string, numberOfColors float64) []color.RGBA
 					r /= 0xff
 					g /= 0xff
 					b /= 0xff
+					//a = opacité
 					a /= 0xff
 					uintColor := uint32(r)<<24 | uint32(g)<<16 | uint32(b)<<8 | uint32(a)
 					cols = append(cols, uintColor)
@@ -136,24 +136,25 @@ func interpolateColors(paletteCode *string, numberOfColors float64) []color.RGBA
 	return interpolatedColors
 }
 
+//sort l'image
 func render(maxIteration int, colors []color.RGBA, done chan struct{}) {
-	width = width * imageSmoothness //résolution de l'image
+	width = width * imageSmoothness
 	height = height * imageSmoothness
 	ratio := float64(height) / float64(width)
 	xmin, xmax := xpos-escapeRadius/2.0, math.Abs(xpos+escapeRadius/2.0)
 	ymin, ymax := ypos-escapeRadius*ratio/2.0, math.Abs(ypos+escapeRadius*ratio/2.0)
 
 	image := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
-
-	for iy := 0; iy < height; iy++ { //Iteration over the 2 dimensional array defined as a 2d system coordinate and applying the mathematical calculation prior to generate the mandelbrot set
-		//HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	//Itération sur les 2 dimensions (x,y) et application de la formule pour dessiner le mandelbrot
+	for iy := 0; iy < height; iy++ {
 		waitGroup.Add(1)
 		go func(iy int) {
 			defer waitGroup.Done()
 
-			for ix := 0; ix < width; ix++ { //goroutine removed
+			for ix := 0; ix < width; ix++ {
 				var x = xmin + (xmax-xmin)*float64(ix)/float64(width-1)
 				var y = ymin + (ymax-ymin)*float64(iy)/float64(height-1)
+				//mandelIteration= appel de la fonction mandelbrot
 				norm, it := mandelIteration(x, y, maxIteration)
 				iteration := float64(maxIteration-it) + math.Log(norm)
 
@@ -185,7 +186,7 @@ func linearInterpolation(c1, c2, mu uint32) uint32 {
 	return c1*(1-mu) + c2*mu
 }
 
-//Mandelbrot function z_{n+1} = z_n^2 + c
+//Mandelbrot fonction z_{n+1} = z_n^2 + c
 func mandelIteration(cx, cy float64, maxIter int) (float64, int) {
 	var x, y, xx, yy float64 = 0.0, 0.0, 0.0, 0.0
 
@@ -204,7 +205,7 @@ func mandelIteration(cx, cy float64, maxIter int) (float64, int) {
 	return logZn, maxIter
 }
 
-//Converti une couleur en un entier
+//Couleur (Hex) à entier
 func rgbaToUint(color color.RGBA) uint32 {
 	r, g, b, a := color.RGBA()
 	r /= 0xff
@@ -214,7 +215,7 @@ func rgbaToUint(color color.RGBA) uint32 {
 	return uint32(r)<<24 | uint32(g)<<16 | uint32(b)<<8 | uint32(a)
 }
 
-//Converti un entier en une couleur
+//Entier à couleur (Hex)
 func uint32ToRgba(col uint32) color.RGBA {
 	r := col >> 24 & 0xff
 	g := col >> 16 & 0xff

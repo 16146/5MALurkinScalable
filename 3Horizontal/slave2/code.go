@@ -1,16 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"image"
 	"image/color"
-	"image/png"
+	"image/jpeg"
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"palette"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -28,7 +29,6 @@ var (
 
 var waitGroup sync.WaitGroup
 
-//Ca c'est les valeurs par défauts des variables
 func init() {
 	flag.Float64Var(&colorStep, "step", 6000, "Color smooth step. Value should be greater than iteration count, otherwise the value will be adjusted to the iteration count.")
 	flag.IntVar(&width, "width", 1024, "Rendered image width")
@@ -39,18 +39,17 @@ func init() {
 	flag.IntVar(&maxIteration, "iteration", 800, "Iteration count")
 	flag.IntVar(&imageSmoothness, "smoothness", 8, "The rendered mandelbrot set smoothness. For a more detailded and clear image use higher numbers. For 4xAA (AA = antialiasing) use -smoothness 4")
 	flag.StringVar(&colorPalette, "palette", "Hippi", "Hippi | Plan9 | AfternoonBlue | SummerBeach | Biochimist | Fiesta")
-	flag.StringVar(&outputFile, "file", "mandelbrot.png", "The rendered mandelbrot image filname")
+	//flag.StringVar(&outputFile, "file", "mandelbrot.png", "The rendered mandelbrot image filname")
+	flag.StringVar(&outputFile, "file", "mandelbrot.txt", "The rendered mandelbrot image filname")
 	flag.Parse()
 }
 
 func main() {
-
-	http.HandleFunc("/get_mbrot", getMbrot)
-
-	log.Fatal(http.ListenAndServe(":8093", nil))
+	http.HandleFunc("/poke", routine)
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
-func getMbrot(w http.ResponseWriter, req *http.Request) {
+func routine(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 
 	done := make(chan struct{})
@@ -75,16 +74,15 @@ func getMbrot(w http.ResponseWriter, req *http.Request) {
 
 	if len(colors) > 0 {
 		fmt.Print("Rendering image...")
-		render(maxIteration, colors, done)
+		render(maxIteration, colors, done, w, req)
 	}
 
 	elapsed := time.Since(start)
 	log.Printf("Process mandelbrot took %s", elapsed)
 	time.Sleep(time.Second)
-
+	return
 }
 
-//Ca c'est pour donner une couleur à chaque itération
 func interpolateColors(paletteCode *string, numberOfColors float64) []color.RGBA {
 	var factor float64
 	steps := []float64{}
@@ -145,8 +143,8 @@ func interpolateColors(paletteCode *string, numberOfColors float64) []color.RGBA
 	return interpolatedColors
 }
 
-func render(maxIteration int, colors []color.RGBA, done chan struct{}) {
-	width = width * imageSmoothness //résolution de l'image
+func render(maxIteration int, colors []color.RGBA, done chan struct{}, w http.ResponseWriter, req *http.Request) {
+	width = width * imageSmoothness
 	height = height * imageSmoothness
 	ratio := float64(height) / float64(width)
 	xmin, xmax := xpos-escapeRadius/2.0, math.Abs(xpos+escapeRadius/2.0)
@@ -154,13 +152,12 @@ func render(maxIteration int, colors []color.RGBA, done chan struct{}) {
 
 	img := image.NewRGBA(image.Rectangle{image.Point{0, height / 2}, image.Point{width, height}})
 
-	for iy := height / 2; iy < height; iy++ { //Iteration over the 2 dimensional array defined as a 2d system coordinate and applying the mathematical calculation prior to generate the mandelbrot set
-		//HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	for iy := height / 2; iy < height; iy++ {
 		waitGroup.Add(1)
 		go func(iy int) {
 			defer waitGroup.Done()
 
-			for ix := 0; ix < width; ix++ { //goroutine removed
+			for ix := 0; ix < width; ix++ {
 				var x = xmin + (xmax-xmin)*float64(ix)/float64(width-1)
 				var y = ymin + (ymax-ymin)*float64(iy)/float64(height-1)
 				//fmt.Printf("%.3f %.3f %.3f %.3f\n", float64(y), float64(height/2), float64(ymin), float64(ymax))
@@ -185,10 +182,24 @@ func render(maxIteration int, colors []color.RGBA, done chan struct{}) {
 
 	waitGroup.Wait()
 
-	output, _ := os.Create(outputFile)
-	png.Encode(output, img)
+	buffer := new(bytes.Buffer)
+	if err := jpeg.Encode(buffer, img, nil); err != nil {
+		log.Println("unable to encode image.")
+	}
+
+	//output, _ := os.Create(outputFile)
+
+	//png.Encode(output, img)
+	//_, err2 := output.Write(buffer.Bytes())
+	//log.Println(err2)
 
 	done <- struct{}{}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Length", strconv.Itoa(len(buffer.Bytes())))
+	if _, err := w.Write(buffer.Bytes()); err != nil {
+		log.Println("unable to write image.")
+	}
+	return
 }
 
 func cosineInterpolation(c1, c2, mu float64) float64 {
@@ -218,8 +229,6 @@ func mandelIteration(cx, cy float64, maxIter int) (float64, int) {
 	logZn := (x*x + y*y) / 2
 	return logZn, maxIter
 }
-
-//Converti une couleur en un entier
 func rgbaToUint(color color.RGBA) uint32 {
 	r, g, b, a := color.RGBA()
 	r /= 0xff
@@ -229,7 +238,6 @@ func rgbaToUint(color color.RGBA) uint32 {
 	return uint32(r)<<24 | uint32(g)<<16 | uint32(b)<<8 | uint32(a)
 }
 
-//Converti un entier en une couleur
 func uint32ToRgba(col uint32) color.RGBA {
 	r := col >> 24 & 0xff
 	g := col >> 16 & 0xff
