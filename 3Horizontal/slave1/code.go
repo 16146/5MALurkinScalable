@@ -36,9 +36,9 @@ func init() {
 	flag.Float64Var(&xpos, "xpos", -0.00275, "Point position on the real axis (defined on `x` axis)")
 	flag.Float64Var(&ypos, "ypos", 0.78912, "Point position on the imaginary axis (defined on `y` axis)")
 	flag.Float64Var(&escapeRadius, "radius", .125689, "Escape Radius")
-	flag.IntVar(&maxIteration, "iteration", 800, "Iteration count")
+	flag.IntVar(&maxIteration, "iteration", 1200, "Iteration count")
 	flag.IntVar(&imageSmoothness, "smoothness", 8, "The rendered mandelbrot set smoothness. For a more detailded and clear image use higher numbers. For 4xAA (AA = antialiasing) use -smoothness 4")
-	flag.StringVar(&colorPalette, "palette", "Hippi", "Hippi | Plan9 | AfternoonBlue | SummerBeach | Biochimist | Fiesta")
+	flag.StringVar(&colorPalette, "palette", "Plan9", "Hippi | Plan9 | AfternoonBlue | SummerBeach | Biochimist | Fiesta")
 	//flag.StringVar(&outputFile, "file", "mandelbrot.png", "The rendered mandelbrot image filname")
 	flag.StringVar(&outputFile, "file", "mandelbrot.txt", "The rendered mandelbrot image filname")
 	flag.Parse()
@@ -62,7 +62,8 @@ func routine(w http.ResponseWriter, req *http.Request) {
 				fmt.Print(".")
 			case <-done:
 				ticker.Stop()
-				fmt.Printf("\n\nMandelbrot set rendered into `%s`\n", outputFile)
+				//fmt.Printf("\n\nMandelbrot set rendered into `%s`\n", outputFile)
+				fmt.Printf("Finished")
 			}
 		}
 	}()
